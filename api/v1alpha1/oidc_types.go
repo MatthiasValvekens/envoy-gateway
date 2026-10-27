@@ -16,6 +16,7 @@ const (
 
 // OIDC defines the configuration for the OpenID Connect (OIDC) authentication.
 // +kubebuilder:validation:XValidation:rule="(has(self.clientID) && !has(self.clientIDRef)) || (!has(self.clientID) && has(self.clientIDRef))", message="only one of clientID or clientIDRef must be set"
+// +kubebuilder:validation:XValidation:rule="has(self.clientSecret) != has(self.clientAssertion)", message="exactly one of clientSecret or clientAssertion must be set"
 // +kubebuilder:validation:XValidation:rule="!(has(self.forwardAccessToken) && self.forwardAccessToken && has(self.forwardIDToken) && self.forwardIDToken.header.lowerAscii() == 'authorization')", message="forwardAccessToken cannot be true when forwardIDToken.header is Authorization"
 type OIDC struct {
 	// The OIDC Provider configuration.
@@ -44,8 +45,19 @@ type OIDC struct {
 	//
 	// This is an Opaque secret. The client secret should be stored in the key
 	// "client-secret".
-	// +kubebuilder:validation:Required
-	ClientSecret gwapiv1.SecretObjectReference `json:"clientSecret"`
+	//
+	// Exactly one of clientSecret or clientAssertion must be set.
+	// +optional
+	ClientSecret *gwapiv1.SecretObjectReference `json:"clientSecret,omitempty"`
+
+	// ClientAssertion configures the client to authenticate to the token endpoint with a
+	// signed assertion instead of a client secret, as defined in
+	// [RFC 7521](https://datatracker.ietf.org/doc/html/rfc7521#section-4.2) and
+	// [RFC 7523](https://datatracker.ietf.org/doc/html/rfc7523#section-2.2).
+	//
+	// Exactly one of clientSecret or clientAssertion must be set.
+	// +optional
+	ClientAssertion *OIDCClientAssertion `json:"clientAssertion,omitempty"`
 
 	// CookieNames configures the names of the cookies that Envoy sets for the
 	// [Authentication Request](https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest).
@@ -208,6 +220,61 @@ type OIDC struct {
 	// If not specified, defaults to false.
 	// +optional
 	PassThroughAuthHeader *bool `json:"passThroughAuthHeader,omitempty"`
+}
+
+// OIDCClientAssertion defines the source of the assertion that the OIDC client presents to
+// the token endpoint.
+//
+// Exactly one source must be set.
+//
+// +kubebuilder:validation:XValidation:rule="has(self.serviceAccountToken)",message="serviceAccountToken must be set"
+type OIDCClientAssertion struct {
+	// ServiceAccountToken uses a token of a Kubernetes ServiceAccount as the assertion.
+	// Envoy Gateway requests the token with the Kubernetes
+	// [TokenRequest API](https://kubernetes.io/docs/reference/kubernetes-api/authentication-resources/token-request-v1/),
+	// and renews it before it expires. The token is sent as a JWT client assertion
+	// (`urn:ietf:params:oauth:client-assertion-type:jwt-bearer`).
+	//
+	// The ServiceAccount must be granted by the owner of this resource: Envoy Gateway
+	// needs permission to `create` the `serviceaccounts/token` subresource of the
+	// ServiceAccount. The Envoy Gateway installation does not grant that permission.
+	//
+	// +optional
+	ServiceAccountToken *OIDCServiceAccountToken `json:"serviceAccountToken,omitempty"`
+}
+
+// OIDCServiceAccountToken defines a Kubernetes ServiceAccount token that is used as a client assertion.
+type OIDCServiceAccountToken struct {
+	// ServiceAccountName is the name of a ServiceAccount in the namespace of the
+	// SecurityPolicy. Referencing a ServiceAccount in another namespace is not supported.
+	//
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:MaxLength=253
+	// +kubebuilder:validation:Pattern=`^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$`
+	ServiceAccountName string `json:"serviceAccountName"`
+
+	// Audiences are the audiences ("aud" claim) of the requested token. Set them to the
+	// value that the OIDC Provider expects of a client assertion, for example the issuer URL
+	// of the OIDC Provider or the audience that its federated credentials require.
+	//
+	// There is no default: a token that carries no explicit audience is valid for the
+	// Kubernetes API server, and would let the token endpoint use it there.
+	//
+	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:MaxItems=8
+	// +kubebuilder:validation:items:MinLength=1
+	// +listType=set
+	Audiences []string `json:"audiences"`
+
+	// Expiration is the requested lifetime of the token. The Kubernetes API server
+	// may issue a token with a different lifetime, and Envoy Gateway renews the token
+	// after 80% of the lifetime it was actually granted.
+	//
+	// If not specified, defaults to 1h. The minimum is 10m.
+	//
+	// +optional
+	// +kubebuilder:validation:XValidation:rule="duration(self) >= duration('10m')",message="expiration must be at least 10m"
+	Expiration *gwapiv1.Duration `json:"expiration,omitempty"`
 }
 
 // OIDCProvider defines the OIDC Provider configuration.

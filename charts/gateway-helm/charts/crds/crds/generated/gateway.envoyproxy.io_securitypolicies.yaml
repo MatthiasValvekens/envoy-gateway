@@ -6304,6 +6304,70 @@ spec:
                 description: OIDC defines the configuration for the OpenID Connect
                   (OIDC) authentication.
                 properties:
+                  clientAssertion:
+                    description: |-
+                      ClientAssertion configures the client to authenticate to the token endpoint with a
+                      signed assertion instead of a client secret, as defined in
+                      [RFC 7521](https://datatracker.ietf.org/doc/html/rfc7521#section-4.2) and
+                      [RFC 7523](https://datatracker.ietf.org/doc/html/rfc7523#section-2.2).
+
+                      Exactly one of clientSecret or clientAssertion must be set.
+                    properties:
+                      serviceAccountToken:
+                        description: |-
+                          ServiceAccountToken uses a token of a Kubernetes ServiceAccount as the assertion.
+                          Envoy Gateway requests the token with the Kubernetes
+                          [TokenRequest API](https://kubernetes.io/docs/reference/kubernetes-api/authentication-resources/token-request-v1/),
+                          and renews it before it expires. The token is sent as a JWT client assertion
+                          (`urn:ietf:params:oauth:client-assertion-type:jwt-bearer`).
+
+                          The ServiceAccount must be granted by the owner of this resource: Envoy Gateway
+                          needs permission to `create` the `serviceaccounts/token` subresource of the
+                          ServiceAccount. The Envoy Gateway installation does not grant that permission.
+                        properties:
+                          audiences:
+                            description: |-
+                              Audiences are the audiences ("aud" claim) of the requested token. Set them to the
+                              value that the OIDC Provider expects of a client assertion, for example the issuer URL
+                              of the OIDC Provider or the audience that its federated credentials require.
+
+                              There is no default: a token that carries no explicit audience is valid for the
+                              Kubernetes API server, and would let the token endpoint use it there.
+                            items:
+                              minLength: 1
+                              type: string
+                            maxItems: 8
+                            minItems: 1
+                            type: array
+                            x-kubernetes-list-type: set
+                          expiration:
+                            description: |-
+                              Expiration is the requested lifetime of the token. The Kubernetes API server
+                              may issue a token with a different lifetime, and Envoy Gateway renews the token
+                              after 80% of the lifetime it was actually granted.
+
+                              If not specified, defaults to 1h. The minimum is 10m.
+                            pattern: ^([0-9]{1,5}(h|m|s|ms)){1,4}$
+                            type: string
+                            x-kubernetes-validations:
+                            - message: expiration must be at least 10m
+                              rule: duration(self) >= duration('10m')
+                          serviceAccountName:
+                            description: |-
+                              ServiceAccountName is the name of a ServiceAccount in the namespace of the
+                              SecurityPolicy. Referencing a ServiceAccount in another namespace is not supported.
+                            maxLength: 253
+                            minLength: 1
+                            pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+                            type: string
+                        required:
+                        - audiences
+                        - serviceAccountName
+                        type: object
+                    type: object
+                    x-kubernetes-validations:
+                    - message: serviceAccountToken must be set
+                      rule: has(self.serviceAccountToken)
                   clientID:
                     description: |-
                       The client ID to be used in the OIDC
@@ -6366,6 +6430,8 @@ spec:
 
                       This is an Opaque secret. The client secret should be stored in the key
                       "client-secret".
+
+                      Exactly one of clientSecret or clientAssertion must be set.
                     properties:
                       group:
                         default: ""
@@ -8420,13 +8486,15 @@ spec:
                       type: string
                     type: array
                 required:
-                - clientSecret
                 - provider
                 type: object
                 x-kubernetes-validations:
                 - message: only one of clientID or clientIDRef must be set
                   rule: (has(self.clientID) && !has(self.clientIDRef)) || (!has(self.clientID)
                     && has(self.clientIDRef))
+                - message: exactly one of clientSecret or clientAssertion must be
+                    set
+                  rule: has(self.clientSecret) != has(self.clientAssertion)
                 - message: forwardAccessToken cannot be true when forwardIDToken.header
                     is Authorization
                   rule: '!(has(self.forwardAccessToken) && self.forwardAccessToken
