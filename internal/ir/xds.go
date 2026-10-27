@@ -1643,7 +1643,16 @@ type OIDC struct {
 	// [Authentication Request](https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest).
 	//
 	// This is an Opaque secret. The client secret should be stored in the key "client-secret".
+	//
+	// Exactly one of ClientSecret and ClientAssertion is set.
 	ClientSecret PrivateBytes `json:"clientSecret,omitempty" yaml:"clientSecret,omitempty"`
+
+	// ClientAssertion is the JWT that the client presents to the token endpoint instead of a
+	// client secret, as defined in RFC 7523. It is a Kubernetes ServiceAccount token that Envoy
+	// Gateway renews, so the value changes over the lifetime of the OIDC configuration.
+	//
+	// Exactly one of ClientSecret and ClientAssertion is set.
+	ClientAssertion PrivateBytes `json:"clientAssertion,omitempty" yaml:"clientAssertion,omitempty"`
 
 	// HMACSecret is the secret used to sign the HMAC of the OAuth2 filter cookies.
 	HMACSecret PrivateBytes `json:"hmacSecret,omitempty" yaml:"hmacSecret,omitempty"`

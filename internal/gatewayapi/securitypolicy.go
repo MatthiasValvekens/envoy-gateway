@@ -2275,6 +2275,52 @@ func (t *Translator) buildLocalJWKS(
 	return *localJWKS.Inline, nil
 }
 
+// useOIDCClientAssertion reports whether the OIDC client authenticates with a client assertion.
+//
+// After a merge, both clientSecret and clientAssertion can be set, because each comes from a
+// different policy. The route-level policy wins, so the assertion is used unless the parent
+// policy of the merge owns it.
+func useOIDCClientAssertion(oidc *egv1a1.OIDC, owners *securityPolicyOwners) bool {
+	if oidc.ClientAssertion == nil {
+		return false
+	}
+	if oidc.ClientSecret == nil {
+		return true
+	}
+	return owners != nil && owners.oidcClientAssertion != owners.mergedParent
+}
+
+// buildOIDCClientAssertion returns the ServiceAccount token that the provider requested for the
+// client assertion of the OIDC configuration. The ServiceAccount is in the namespace of the owner
+// of the assertion, which is why a ServiceAccount in another namespace cannot be referenced.
+func (t *Translator) buildOIDCClientAssertion(
+	assertion *egv1a1.OIDCClientAssertion,
+	owner *egv1a1.SecurityPolicy,
+) ([]byte, error) {
+	sat := assertion.ServiceAccountToken
+	if sat == nil {
+		// This is just a sanity check - the CRD validation should have caught this.
+		return nil, errors.New("serviceAccountToken must be specified in clientAssertion")
+	}
+
+	expirationSeconds, err := resource.ServiceAccountTokenExpirationSeconds(sat)
+	if err != nil {
+		return nil, err
+	}
+
+	token := t.GetServiceAccountToken(owner.Namespace, sat.ServiceAccountName, sat.Audiences, expirationSeconds)
+	switch {
+	case token == nil:
+		return nil, fmt.Errorf("token for ServiceAccount %s/%s is not available", owner.Namespace, sat.ServiceAccountName)
+	case token.Error != "":
+		return nil, fmt.Errorf("token for ServiceAccount %s/%s is not available: %s", owner.Namespace, sat.ServiceAccountName, token.Error)
+	case token.Token == "":
+		return nil, fmt.Errorf("token for ServiceAccount %s/%s is empty", owner.Namespace, sat.ServiceAccountName)
+	}
+
+	return []byte(token.Token), nil
+}
+
 func (t *Translator) buildOIDC(
 	policy *egv1a1.SecurityPolicy,
 	owners *securityPolicyOwners,
@@ -2327,21 +2373,34 @@ func (t *Translator) buildOIDC(
 		return nil, fmt.Errorf("client ID must be specified in OIDC policy %s/%s", policy.Namespace, policy.Name)
 	}
 
-	clientSecretOwner := policyOwnerOr(owners.oidcClientSecret, policy)
-	from := crossNamespaceFrom{
-		group:     egv1a1.GroupName,
-		kind:      resource.KindSecurityPolicy,
-		namespace: clientSecretOwner.Namespace,
-	}
-	if clientSecret, err = t.validateSecretRef(true, from, oidc.ClientSecret, resources); err != nil {
-		return nil, err
-	}
+	var clientSecretBytes, clientAssertionBytes []byte
+	if useOIDCClientAssertion(oidc, owners) {
+		if clientAssertionBytes, err = t.buildOIDCClientAssertion(oidc.ClientAssertion, policyOwnerOr(owners.oidcClientAssertion, policy)); err != nil {
+			return nil, err
+		}
+	} else {
+		if oidc.ClientSecret == nil {
+			// This is just a sanity check - the CRD validation should have caught this.
+			return nil, fmt.Errorf("client secret or client assertion must be specified in OIDC policy %s/%s", policy.Namespace, policy.Name)
+		}
 
-	clientSecretBytes, ok := clientSecret.Data[egv1a1.OIDCClientSecretKey]
-	if !ok || len(clientSecretBytes) == 0 {
-		return nil, fmt.Errorf(
-			"client secret not found in secret %s/%s",
-			clientSecret.Namespace, clientSecret.Name)
+		clientSecretOwner := policyOwnerOr(owners.oidcClientSecret, policy)
+		from := crossNamespaceFrom{
+			group:     egv1a1.GroupName,
+			kind:      resource.KindSecurityPolicy,
+			namespace: clientSecretOwner.Namespace,
+		}
+		if clientSecret, err = t.validateSecretRef(true, from, *oidc.ClientSecret, resources); err != nil {
+			return nil, err
+		}
+
+		var ok bool
+		clientSecretBytes, ok = clientSecret.Data[egv1a1.OIDCClientSecretKey]
+		if !ok || len(clientSecretBytes) == 0 {
+			return nil, fmt.Errorf(
+				"client secret not found in secret %s/%s",
+				clientSecret.Namespace, clientSecret.Name)
+		}
 	}
 
 	scopes := appendOpenidScopeIfNotExist(oidc.Scopes)
@@ -2411,6 +2470,7 @@ func (t *Translator) buildOIDC(
 		Provider:               *provider,
 		ClientID:               clientID,
 		ClientSecret:           clientSecretBytes,
+		ClientAssertion:        clientAssertionBytes,
 		Scopes:                 scopes,
 		Resources:              oidc.Resources,
 		RedirectURL:            redirectURL,
@@ -3696,6 +3756,7 @@ type securityPolicyOwners struct {
 	oidcProviderBackendRefs  *egv1a1.SecurityPolicy
 	oidcClientIDRef          *egv1a1.SecurityPolicy
 	oidcClientSecret         *egv1a1.SecurityPolicy
+	oidcClientAssertion      *egv1a1.SecurityPolicy
 	jwtProviders             *egv1a1.SecurityPolicy
 }
 
@@ -3754,7 +3815,10 @@ func buildSecurityPolicyOwners(route, parent *egv1a1.SecurityPolicy) *securityPo
 			return p.Spec.OIDC != nil && p.Spec.OIDC.ClientIDRef != nil
 		}),
 		oidcClientSecret: ownerOf(route, parent, func(p *egv1a1.SecurityPolicy) bool {
-			return p.Spec.OIDC != nil
+			return p.Spec.OIDC != nil && p.Spec.OIDC.ClientSecret != nil
+		}),
+		oidcClientAssertion: ownerOf(route, parent, func(p *egv1a1.SecurityPolicy) bool {
+			return p.Spec.OIDC != nil && p.Spec.OIDC.ClientAssertion != nil
 		}),
 		jwtProviders: ownerOf(route, parent, func(p *egv1a1.SecurityPolicy) bool {
 			return p.Spec.JWT != nil && len(p.Spec.JWT.Providers) > 0

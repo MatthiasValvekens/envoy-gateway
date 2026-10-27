@@ -3107,7 +3107,7 @@ func Test_securityPolicyOwnerChoose(t *testing.T) {
 					},
 				},
 				OIDC: &egv1a1.OIDC{
-					ClientSecret: gwapiv1.SecretObjectReference{Name: "parent-client-secret"},
+					ClientSecret: &gwapiv1.SecretObjectReference{Name: "parent-client-secret"},
 					ClientIDRef:  &gwapiv1.SecretObjectReference{Name: "parent-client-id"},
 					Provider: egv1a1.OIDCProvider{
 						Issuer: "https://parent.example.com",
@@ -3151,7 +3151,7 @@ func Test_securityPolicyOwnerChoose(t *testing.T) {
 					},
 				},
 				OIDC: &egv1a1.OIDC{
-					ClientSecret: gwapiv1.SecretObjectReference{Name: "route-client-secret"},
+					ClientSecret: &gwapiv1.SecretObjectReference{Name: "route-client-secret"},
 					ClientIDRef:  &gwapiv1.SecretObjectReference{Name: "route-client-id"},
 					Provider: egv1a1.OIDCProvider{
 						Issuer: "https://route.example.com",
@@ -3180,6 +3180,7 @@ func Test_securityPolicyOwnerChoose(t *testing.T) {
 		assert.Same(t, routePolicy, owners.oidc)
 		assert.Same(t, routePolicy, owners.oidcClientIDRef)
 		assert.Same(t, routePolicy, owners.oidcClientSecret)
+		assert.Same(t, parentPolicy, owners.oidcClientAssertion)
 		assert.Same(t, routePolicy, owners.oidcProviderBackendRefs)
 		assert.Same(t, routePolicy, owners.jwtProviders)
 		assert.Same(t, routePolicy, owners.extAuthContextExtensions["shared"])
@@ -3307,4 +3308,129 @@ func TestJWTName(t *testing.T) {
 		require.Equal(t, name, jwtName(route, buildSecurityPolicyOwners(route, long("a"))))
 		require.NotEqual(t, name, other)
 	})
+}
+
+func Test_useOIDCClientAssertion(t *testing.T) {
+	secret := new(gwapiv1.SecretObjectReference{Name: "client-secret"})
+	assertion := &egv1a1.OIDCClientAssertion{
+		ServiceAccountToken: &egv1a1.OIDCServiceAccountToken{ServiceAccountName: "sa", Audiences: []string{"aud"}},
+	}
+	parent := &egv1a1.SecurityPolicy{ObjectMeta: metav1.ObjectMeta{Name: "parent"}}
+	route := &egv1a1.SecurityPolicy{ObjectMeta: metav1.ObjectMeta{Name: "route"}}
+
+	tests := []struct {
+		name   string
+		oidc   *egv1a1.OIDC
+		owners *securityPolicyOwners
+		want   bool
+	}{
+		{
+			name:   "client secret only",
+			oidc:   &egv1a1.OIDC{ClientSecret: secret},
+			owners: &securityPolicyOwners{},
+			want:   false,
+		},
+		{
+			name:   "client assertion only",
+			oidc:   &egv1a1.OIDC{ClientAssertion: assertion},
+			owners: &securityPolicyOwners{},
+			want:   true,
+		},
+		{
+			name:   "merged: the route sets the client assertion, the parent the client secret",
+			oidc:   &egv1a1.OIDC{ClientSecret: secret, ClientAssertion: assertion},
+			owners: &securityPolicyOwners{mergedParent: parent, oidcClientSecret: parent, oidcClientAssertion: route},
+			want:   true,
+		},
+		{
+			name:   "merged: the route sets the client secret, the parent the client assertion",
+			oidc:   &egv1a1.OIDC{ClientSecret: secret, ClientAssertion: assertion},
+			owners: &securityPolicyOwners{mergedParent: parent, oidcClientSecret: route, oidcClientAssertion: parent},
+			want:   false,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, useOIDCClientAssertion(tc.oidc, tc.owners))
+		})
+	}
+}
+
+func Test_buildOIDCClientAssertion(t *testing.T) {
+	sat := &egv1a1.OIDCServiceAccountToken{
+		ServiceAccountName: "oauth2-client",
+		Audiences:          []string{"b", "a"},
+		Expiration:         new(gwapiv1.Duration("30m")),
+	}
+	assertion := &egv1a1.OIDCClientAssertion{ServiceAccountToken: sat}
+	owner := &egv1a1.SecurityPolicy{ObjectMeta: metav1.ObjectMeta{Namespace: "owner-ns", Name: "owner"}}
+
+	tests := []struct {
+		name      string
+		assertion *egv1a1.OIDCClientAssertion
+		tokens    []*resource.ServiceAccountToken
+		want      string
+		wantErr   string
+	}{
+		{
+			name:      "token found, audience order does not matter",
+			assertion: assertion,
+			tokens: []*resource.ServiceAccountToken{
+				{Namespace: "owner-ns", Name: "oauth2-client", Audiences: []string{"a", "b"}, ExpirationSeconds: 1800, Token: "the-token"},
+			},
+			want: "the-token",
+		},
+		{
+			name:      "token for another namespace is not used",
+			assertion: assertion,
+			tokens: []*resource.ServiceAccountToken{
+				{Namespace: "other-ns", Name: "oauth2-client", Audiences: []string{"a", "b"}, ExpirationSeconds: 1800, Token: "the-token"},
+			},
+			wantErr: "token for ServiceAccount owner-ns/oauth2-client is not available",
+		},
+		{
+			name:      "token for another expiration is not used",
+			assertion: assertion,
+			tokens: []*resource.ServiceAccountToken{
+				{Namespace: "owner-ns", Name: "oauth2-client", Audiences: []string{"a", "b"}, ExpirationSeconds: 3600, Token: "the-token"},
+			},
+			wantErr: "token for ServiceAccount owner-ns/oauth2-client is not available",
+		},
+		{
+			name:      "error from the provider",
+			assertion: assertion,
+			tokens: []*resource.ServiceAccountToken{
+				{Namespace: "owner-ns", Name: "oauth2-client", Audiences: []string{"a", "b"}, ExpirationSeconds: 1800, Error: "denied"},
+			},
+			wantErr: "token for ServiceAccount owner-ns/oauth2-client is not available: denied",
+		},
+		{
+			name:      "empty token",
+			assertion: assertion,
+			tokens: []*resource.ServiceAccountToken{
+				{Namespace: "owner-ns", Name: "oauth2-client", Audiences: []string{"a", "b"}, ExpirationSeconds: 1800},
+			},
+			wantErr: "token for ServiceAccount owner-ns/oauth2-client is empty",
+		},
+		{
+			name:      "no source",
+			assertion: &egv1a1.OIDCClientAssertion{},
+			wantErr:   "serviceAccountToken must be specified",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			translator := &Translator{TranslatorContext: &TranslatorContext{}}
+			translator.SetServiceAccountTokens(tc.tokens)
+
+			got, err := translator.buildOIDCClientAssertion(tc.assertion, owner)
+
+			if tc.wantErr != "" {
+				require.ErrorContains(t, err, tc.wantErr)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, string(got))
+		})
+	}
 }

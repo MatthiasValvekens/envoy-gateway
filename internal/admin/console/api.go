@@ -284,6 +284,7 @@ func redactSecretData(resources []*resource.Resources) []*resource.Resources {
 		// and want to avoid unnecessary memory allocations.
 		copyRes := *res
 		copyRes.Secrets = redactSecrets(res.Secrets)
+		copyRes.ServiceAccountTokens = redactServiceAccountTokens(res.ServiceAccountTokens)
 		redactedResources[i] = &copyRes
 	}
 
@@ -315,6 +316,23 @@ func redactSecrets(secrets []*corev1.Secret) []*corev1.Secret {
 			for key := range secret.StringData {
 				redacted[i].StringData[key] = redactedSecretValue
 			}
+		}
+	}
+
+	return redacted
+}
+
+// redactServiceAccountTokens returns copies of the tokens without the token values, which are credentials.
+func redactServiceAccountTokens(tokens []*resource.ServiceAccountToken) []*resource.ServiceAccountToken {
+	if tokens == nil {
+		return nil
+	}
+
+	redacted := make([]*resource.ServiceAccountToken, len(tokens))
+	for i, token := range tokens {
+		redacted[i] = token.DeepCopy()
+		if redacted[i].Token != "" {
+			redacted[i].Token = redactedSecretValue
 		}
 	}
 

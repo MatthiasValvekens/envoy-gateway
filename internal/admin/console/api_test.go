@@ -393,9 +393,17 @@ func TestHandleAPIConfigDumpWithResourceAllRedactsSecrets(t *testing.T) {
 			"token": "supersecret",
 		},
 	}
+	saToken := &resource.ServiceAccountToken{
+		Namespace:         "default",
+		Name:              "oauth2-client",
+		Audiences:         []string{"https://sso.example.com"},
+		ExpirationSeconds: 3600,
+		Token:             "supersecrettoken",
+	}
 	controllerResources := resource.ControllerResources{
 		&resource.Resources{
-			Secrets: []*corev1.Secret{secret},
+			Secrets:              []*corev1.Secret{secret},
+			ServiceAccountTokens: []*resource.ServiceAccountToken{saToken},
 		},
 	}
 	providerRes.GatewayAPIResources.Store("test", &resource.ControllerResourcesContext{
@@ -425,12 +433,16 @@ func TestHandleAPIConfigDumpWithResourceAllRedactsSecrets(t *testing.T) {
 	assert.Contains(t, masked.Data, "token")
 	assert.Equal(t, redactedSecretValueBytes, masked.Data["token"])
 	assert.Equal(t, redactedSecretValue, masked.StringData["token"])
+	require.Len(t, result.Resources[0].ServiceAccountTokens, 1)
+	assert.Equal(t, redactedSecretValue, result.Resources[0].ServiceAccountTokens[0].Token)
+	assert.Equal(t, "oauth2-client", result.Resources[0].ServiceAccountTokens[0].Name)
 	assert.Equal(t, "test-secret", masked.Name)
 	assert.Empty(t, masked.Annotations)
 	assert.Empty(t, masked.ManagedFields)
 	// Ensure the original secret is not modified
 	assert.Equal(t, []byte("supersecret"), secret.Data["token"])
 	assert.Equal(t, "supersecret", secret.StringData["token"])
+	assert.Equal(t, "supersecrettoken", saToken.Token)
 	assert.Equal(t, map[string]string{
 		corev1.LastAppliedConfigAnnotation: "{\"data\":{\"token\":\"c3VwZXJzZWNyZXQ=\"}}",
 		"example.com/foo":                  "value",

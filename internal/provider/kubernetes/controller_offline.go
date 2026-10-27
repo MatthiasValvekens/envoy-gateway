@@ -9,6 +9,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"time"
 
 	discoveryv1 "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -137,6 +138,8 @@ func NewOfflineGatewayAPIController(
 		udpRouteCRDExists:      true,
 		backendCRDExists:       true,
 	}
+
+	r.serviceAccountTokens = newServiceAccountTokenCache(time.Now, offlineServiceAccountTokenMinter)
 
 	r.log.Info("created offline gatewayapi controller")
 

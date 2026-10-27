@@ -988,6 +988,7 @@ type TranslatorContext struct {
 	SecretMap               map[types.NamespacedName]*corev1.Secret
 	ConfigMapMap            map[types.NamespacedName]*corev1.ConfigMap
 	ClusterTrustBundleMap   map[types.NamespacedName]*certificatesv1b1.ClusterTrustBundle
+	ServiceAccountTokenMap  map[string]*resource.ServiceAccountToken
 	EndpointSliceMap        map[backendServiceKey][]*discoveryv1.EndpointSlice
 	BackendClusterMap       map[BackendClusterKey]*ir.BackendCluster
 	ExtensionBackendMap     map[ExtensionBackendKey]*ir.ExtensionBackend
@@ -1094,6 +1095,22 @@ func (t *TranslatorContext) SetConfigMaps(configMaps []*corev1.ConfigMap) {
 		configMapMap[utils.NamespacedName(configMap)] = configMap
 	}
 	t.ConfigMapMap = configMapMap
+}
+
+// GetServiceAccountToken returns the token requested for the ServiceAccount with the given
+// audiences and expiration, or nil if the provider did not supply one.
+func (t *TranslatorContext) GetServiceAccountToken(
+	namespace, name string, audiences []string, expirationSeconds int64,
+) *resource.ServiceAccountToken {
+	return t.ServiceAccountTokenMap[resource.ServiceAccountTokenKey(namespace, name, audiences, expirationSeconds)]
+}
+
+func (t *TranslatorContext) SetServiceAccountTokens(tokens []*resource.ServiceAccountToken) {
+	tokenMap := make(map[string]*resource.ServiceAccountToken, len(tokens))
+	for _, token := range tokens {
+		tokenMap[token.Key()] = token
+	}
+	t.ServiceAccountTokenMap = tokenMap
 }
 
 func (t *TranslatorContext) GetClusterTrustBundle(name string) *certificatesv1b1.ClusterTrustBundle {

@@ -2441,9 +2441,9 @@ func TestSecurityPolicyTarget(t *testing.T) {
 							TokenEndpoint:         new("https://oauth2.googleapis.com/token"),
 						},
 						ClientID: new("client-id"),
-						ClientSecret: gwapiv1b1.SecretObjectReference{
+						ClientSecret: new(gwapiv1b1.SecretObjectReference{
 							Name: "secret",
-						},
+						}),
 					},
 				}
 			},
@@ -2484,9 +2484,9 @@ func TestSecurityPolicyTarget(t *testing.T) {
 							TokenEndpoint:         new("https://oauth2.googleapis.com/token"),
 						},
 						ClientID: new("client-id"),
-						ClientSecret: gwapiv1b1.SecretObjectReference{
+						ClientSecret: new(gwapiv1b1.SecretObjectReference{
 							Name: "secret",
-						},
+						}),
 					},
 				}
 			},
@@ -2541,9 +2541,9 @@ func TestSecurityPolicyTarget(t *testing.T) {
 							AuthorizationEndpoint: new("https://accounts.google.com/o/oauth2/v2/auth"),
 							TokenEndpoint:         new("https://oauth2.googleapis.com/token"),
 						},
-						ClientSecret: gwapiv1b1.SecretObjectReference{
+						ClientSecret: new(gwapiv1b1.SecretObjectReference{
 							Name: "secret",
-						},
+						}),
 					},
 				}
 			},
@@ -2574,9 +2574,9 @@ func TestSecurityPolicyTarget(t *testing.T) {
 						ClientIDRef: &gwapiv1b1.SecretObjectReference{
 							Name: "secret",
 						},
-						ClientSecret: gwapiv1b1.SecretObjectReference{
+						ClientSecret: new(gwapiv1b1.SecretObjectReference{
 							Name: "secret",
-						},
+						}),
 					},
 				}
 			},
@@ -2604,9 +2604,9 @@ func TestSecurityPolicyTarget(t *testing.T) {
 							TokenEndpoint:         new("https://oauth2.googleapis.com/token"),
 						},
 						ClientID: new("client-id"),
-						ClientSecret: gwapiv1b1.SecretObjectReference{
+						ClientSecret: new(gwapiv1b1.SecretObjectReference{
 							Name: "secret",
-						},
+						}),
 						CookieDomain: new("m.example.com"),
 					},
 				}
@@ -2635,9 +2635,9 @@ func TestSecurityPolicyTarget(t *testing.T) {
 							TokenEndpoint:         new("https://oauth2.googleapis.com/token"),
 						},
 						ClientID: new("client-id"),
-						ClientSecret: gwapiv1b1.SecretObjectReference{
+						ClientSecret: new(gwapiv1b1.SecretObjectReference{
 							Name: "secret",
-						},
+						}),
 						CookieDomain: new("example.m.com"),
 					},
 				}
@@ -2666,9 +2666,9 @@ func TestSecurityPolicyTarget(t *testing.T) {
 							TokenEndpoint:         new("https://oauth2.googleapis.com/token"),
 						},
 						ClientID: new("client-id"),
-						ClientSecret: gwapiv1b1.SecretObjectReference{
+						ClientSecret: new(gwapiv1b1.SecretObjectReference{
 							Name: "secret",
-						},
+						}),
 						CookieDomain: new("-example.m.com"),
 					},
 				}
@@ -2695,7 +2695,7 @@ func TestSecurityPolicyTarget(t *testing.T) {
 							TokenEndpoint:         new("https://oauth2.googleapis.com/token"),
 						},
 						ClientID:     new("client-id"),
-						ClientSecret: gwapiv1b1.SecretObjectReference{Name: "secret"},
+						ClientSecret: new(gwapiv1b1.SecretObjectReference{Name: "secret"}),
 						ForwardIDToken: &egv1a1.OIDCTokenForwarding{
 							Header: "X-ID-Token",
 						},
@@ -2724,7 +2724,7 @@ func TestSecurityPolicyTarget(t *testing.T) {
 							TokenEndpoint:         new("https://oauth2.googleapis.com/token"),
 						},
 						ClientID:     new("client-id"),
-						ClientSecret: gwapiv1b1.SecretObjectReference{Name: "secret"},
+						ClientSecret: new(gwapiv1b1.SecretObjectReference{Name: "secret"}),
 						// Underscore is a valid RFC 7230 token character; it must be
 						// accepted by both the CRD and the translation-time validation.
 						ForwardIDToken: &egv1a1.OIDCTokenForwarding{
@@ -2755,7 +2755,7 @@ func TestSecurityPolicyTarget(t *testing.T) {
 							TokenEndpoint:         new("https://oauth2.googleapis.com/token"),
 						},
 						ClientID:     new("client-id"),
-						ClientSecret: gwapiv1b1.SecretObjectReference{Name: "secret"},
+						ClientSecret: new(gwapiv1b1.SecretObjectReference{Name: "secret"}),
 						ForwardIDToken: &egv1a1.OIDCTokenForwarding{
 							Header: "Authorization",
 						},
@@ -2784,7 +2784,7 @@ func TestSecurityPolicyTarget(t *testing.T) {
 							TokenEndpoint:         new("https://oauth2.googleapis.com/token"),
 						},
 						ClientID:     new("client-id"),
-						ClientSecret: gwapiv1b1.SecretObjectReference{Name: "secret"},
+						ClientSecret: new(gwapiv1b1.SecretObjectReference{Name: "secret"}),
 						ForwardIDToken: &egv1a1.OIDCTokenForwarding{
 							Header: ":path",
 						},
@@ -2813,7 +2813,7 @@ func TestSecurityPolicyTarget(t *testing.T) {
 							TokenEndpoint:         new("https://oauth2.googleapis.com/token"),
 						},
 						ClientID:     new("client-id"),
-						ClientSecret: gwapiv1b1.SecretObjectReference{Name: "secret"},
+						ClientSecret: new(gwapiv1b1.SecretObjectReference{Name: "secret"}),
 						ForwardIDToken: &egv1a1.OIDCTokenForwarding{
 							Header: "X-Id\nToken",
 						},
@@ -2842,7 +2842,7 @@ func TestSecurityPolicyTarget(t *testing.T) {
 							TokenEndpoint:         new("https://oauth2.googleapis.com/token"),
 						},
 						ClientID:     new("client-id"),
-						ClientSecret: gwapiv1b1.SecretObjectReference{Name: "secret"},
+						ClientSecret: new(gwapiv1b1.SecretObjectReference{Name: "secret"}),
 						ForwardIDToken: &egv1a1.OIDCTokenForwarding{
 							Header: "host",
 						},
@@ -2871,7 +2871,7 @@ func TestSecurityPolicyTarget(t *testing.T) {
 							TokenEndpoint:         new("https://oauth2.googleapis.com/token"),
 						},
 						ClientID:           new("client-id"),
-						ClientSecret:       gwapiv1b1.SecretObjectReference{Name: "secret"},
+						ClientSecret:       new(gwapiv1b1.SecretObjectReference{Name: "secret"}),
 						ForwardAccessToken: new(true),
 						ForwardIDToken: &egv1a1.OIDCTokenForwarding{
 							Header: "authorization",
@@ -2902,7 +2902,7 @@ func TestSecurityPolicyTarget(t *testing.T) {
 							EndSessionEndpoint:    new("https://accounts.google.com/o/oauth2/v2/logout"),
 						},
 						ClientID:     new("client-id"),
-						ClientSecret: gwapiv1b1.SecretObjectReference{Name: "secret"},
+						ClientSecret: new(gwapiv1b1.SecretObjectReference{Name: "secret"}),
 						PostLogoutRedirect: &egv1a1.OIDCPostLogoutRedirect{
 							URI: new("https://www.example.com/loggedout"),
 						},
@@ -2931,7 +2931,7 @@ func TestSecurityPolicyTarget(t *testing.T) {
 							TokenEndpoint:         new("https://oauth2.googleapis.com/token"),
 						},
 						ClientID:     new("client-id"),
-						ClientSecret: gwapiv1b1.SecretObjectReference{Name: "secret"},
+						ClientSecret: new(gwapiv1b1.SecretObjectReference{Name: "secret"}),
 						// Envoy command operators are a valid URI value, so the CRD must not
 						// constrain this field to a well-formed URI.
 						PostLogoutRedirect: &egv1a1.OIDCPostLogoutRedirect{
@@ -2962,7 +2962,7 @@ func TestSecurityPolicyTarget(t *testing.T) {
 							TokenEndpoint:         new("https://oauth2.googleapis.com/token"),
 						},
 						ClientID:     new("client-id"),
-						ClientSecret: gwapiv1b1.SecretObjectReference{Name: "secret"},
+						ClientSecret: new(gwapiv1b1.SecretObjectReference{Name: "secret"}),
 						PostLogoutRedirect: &egv1a1.OIDCPostLogoutRedirect{
 							Disabled: new(true),
 						},
@@ -2991,7 +2991,7 @@ func TestSecurityPolicyTarget(t *testing.T) {
 							TokenEndpoint:         new("https://oauth2.googleapis.com/token"),
 						},
 						ClientID:     new("client-id"),
-						ClientSecret: gwapiv1b1.SecretObjectReference{Name: "secret"},
+						ClientSecret: new(gwapiv1b1.SecretObjectReference{Name: "secret"}),
 						// Explicitly false is accepted and means the same as leaving
 						// postLogoutRedirect unset.
 						PostLogoutRedirect: &egv1a1.OIDCPostLogoutRedirect{
@@ -3022,7 +3022,7 @@ func TestSecurityPolicyTarget(t *testing.T) {
 							TokenEndpoint:         new("https://oauth2.googleapis.com/token"),
 						},
 						ClientID:     new("client-id"),
-						ClientSecret: gwapiv1b1.SecretObjectReference{Name: "secret"},
+						ClientSecret: new(gwapiv1b1.SecretObjectReference{Name: "secret"}),
 						PostLogoutRedirect: &egv1a1.OIDCPostLogoutRedirect{
 							URI:      new("https://www.example.com/loggedout"),
 							Disabled: new(true),
@@ -3052,7 +3052,7 @@ func TestSecurityPolicyTarget(t *testing.T) {
 							TokenEndpoint:         new("https://oauth2.googleapis.com/token"),
 						},
 						ClientID:     new("client-id"),
-						ClientSecret: gwapiv1b1.SecretObjectReference{Name: "secret"},
+						ClientSecret: new(gwapiv1b1.SecretObjectReference{Name: "secret"}),
 						PostLogoutRedirect: &egv1a1.OIDCPostLogoutRedirect{
 							URI:      new("https://www.example.com/loggedout"),
 							Disabled: new(false),
@@ -3082,7 +3082,7 @@ func TestSecurityPolicyTarget(t *testing.T) {
 							TokenEndpoint:         new("https://oauth2.googleapis.com/token"),
 						},
 						ClientID:           new("client-id"),
-						ClientSecret:       gwapiv1b1.SecretObjectReference{Name: "secret"},
+						ClientSecret:       new(gwapiv1b1.SecretObjectReference{Name: "secret"}),
 						PostLogoutRedirect: &egv1a1.OIDCPostLogoutRedirect{},
 					},
 				}
@@ -3109,7 +3109,7 @@ func TestSecurityPolicyTarget(t *testing.T) {
 							TokenEndpoint:         new("https://oauth2.googleapis.com/token"),
 						},
 						ClientID:     new("client-id"),
-						ClientSecret: gwapiv1b1.SecretObjectReference{Name: "secret"},
+						ClientSecret: new(gwapiv1b1.SecretObjectReference{Name: "secret"}),
 						PostLogoutRedirect: &egv1a1.OIDCPostLogoutRedirect{
 							URI: new(""),
 						},
@@ -3393,9 +3393,9 @@ func securityPolicySpecWithOIDCIssuer(issuer string) egv1a1.SecurityPolicySpec {
 				TokenEndpoint:         new("https://keycloak.gateway-conformance-infra/realms/master/protocol/openid-connect/token"),
 			},
 			ClientID: new("client-id"),
-			ClientSecret: gwapiv1b1.SecretObjectReference{
+			ClientSecret: new(gwapiv1b1.SecretObjectReference{
 				Name: "secret",
-			},
+			}),
 		},
 	}
 }
@@ -3424,7 +3424,7 @@ func TestSecurityPolicyOIDCCookieNames(t *testing.T) {
 					TokenEndpoint:         new("https://oauth2.googleapis.com/token"),
 				},
 				ClientID:     new("client-id"),
-				ClientSecret: gwapiv1b1.SecretObjectReference{Name: "secret"},
+				ClientSecret: new(gwapiv1b1.SecretObjectReference{Name: "secret"}),
 			},
 		},
 	}
@@ -3576,6 +3576,204 @@ func TestSecurityPolicyOIDCCookieNames(t *testing.T) {
 			sp := baseSP.DeepCopy()
 			sp.Name = fmt.Sprintf("sp-oidc-cookie-names-%v", time.Now().UnixNano())
 			sp.Spec.OIDC.CookieNames = tc.cookieNames
+
+			err := c.Create(ctx, sp)
+			if (len(tc.wantErrors) != 0) != (err != nil) {
+				t.Fatalf("Unexpected response while creating SecurityPolicy; got err=\n%v\n;want error=%v", err, tc.wantErrors)
+			}
+
+			var missingErrorStrings []string
+			for _, wantError := range tc.wantErrors {
+				if !strings.Contains(strings.ToLower(err.Error()), strings.ToLower(wantError)) {
+					missingErrorStrings = append(missingErrorStrings, wantError)
+				}
+			}
+			if len(missingErrorStrings) != 0 {
+				t.Errorf("Unexpected response while creating SecurityPolicy; got err=\n%v\n;missing strings within error=%q", err, missingErrorStrings)
+			}
+		})
+	}
+}
+
+func TestSecurityPolicyOIDCClientAssertion(t *testing.T) {
+	ctx := context.Background()
+	baseSP := egv1a1.SecurityPolicy{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "sp",
+			Namespace: metav1.NamespaceDefault,
+		},
+		Spec: egv1a1.SecurityPolicySpec{
+			PolicyTargetReferences: egv1a1.PolicyTargetReferences{
+				TargetRef: &gwapiv1.LocalPolicyTargetReferenceWithSectionName{
+					LocalPolicyTargetReference: gwapiv1.LocalPolicyTargetReference{
+						Group: gwapiv1.Group("gateway.networking.k8s.io"),
+						Kind:  gwapiv1.Kind("Gateway"),
+						Name:  gwapiv1.ObjectName("eg"),
+					},
+				},
+			},
+			OIDC: &egv1a1.OIDC{
+				Provider: egv1a1.OIDCProvider{
+					Issuer:                "https://accounts.google.com",
+					AuthorizationEndpoint: new("https://accounts.google.com/o/oauth2/v2/auth"),
+					TokenEndpoint:         new("https://oauth2.googleapis.com/token"),
+				},
+				ClientID: new("client-id"),
+			},
+		},
+	}
+
+	validAssertion := func() *egv1a1.OIDCClientAssertion {
+		return &egv1a1.OIDCClientAssertion{
+			ServiceAccountToken: &egv1a1.OIDCServiceAccountToken{
+				ServiceAccountName: "oauth2-client",
+				Audiences:          []string{"https://sso.example.com/realms/lab"},
+			},
+		}
+	}
+
+	cases := []struct {
+		desc         string
+		clientSecret *gwapiv1.SecretObjectReference
+		assertion    func() *egv1a1.OIDCClientAssertion
+		wantErrors   []string
+	}{
+		{
+			desc:         "client secret only",
+			clientSecret: new(gwapiv1.SecretObjectReference{Name: "secret"}),
+		},
+		{
+			desc:      "client assertion with a ServiceAccount token",
+			assertion: validAssertion,
+		},
+		{
+			desc: "client assertion with all fields",
+			assertion: func() *egv1a1.OIDCClientAssertion {
+				a := validAssertion()
+				a.ServiceAccountToken.Audiences = []string{"https://sso.example.com/realms/lab", "api://AzureADTokenExchange"}
+				a.ServiceAccountToken.Expiration = new(gwapiv1.Duration("10m"))
+				return a
+			},
+		},
+		{
+			desc:         "both client secret and client assertion",
+			clientSecret: new(gwapiv1.SecretObjectReference{Name: "secret"}),
+			assertion:    validAssertion,
+			wantErrors: []string{
+				"spec.oidc",
+				"exactly one of clientSecret or clientAssertion must be set",
+			},
+		},
+		{
+			desc: "neither client secret nor client assertion",
+			wantErrors: []string{
+				"spec.oidc",
+				"exactly one of clientSecret or clientAssertion must be set",
+			},
+		},
+		{
+			desc: "client assertion without a source",
+			assertion: func() *egv1a1.OIDCClientAssertion {
+				return &egv1a1.OIDCClientAssertion{}
+			},
+			wantErrors: []string{
+				"spec.oidc.clientAssertion",
+				"serviceAccountToken must be set",
+			},
+		},
+		{
+			desc: "no audiences",
+			assertion: func() *egv1a1.OIDCClientAssertion {
+				a := validAssertion()
+				a.ServiceAccountToken.Audiences = []string{}
+				return a
+			},
+			wantErrors: []string{
+				"spec.oidc.clientAssertion.serviceAccountToken.audiences",
+				"should have at least 1 items",
+			},
+		},
+		{
+			desc: "audiences missing",
+			assertion: func() *egv1a1.OIDCClientAssertion {
+				a := validAssertion()
+				a.ServiceAccountToken.Audiences = nil
+				return a
+			},
+			wantErrors: []string{
+				"spec.oidc.clientAssertion.serviceAccountToken.audiences",
+			},
+		},
+		{
+			desc: "empty audience",
+			assertion: func() *egv1a1.OIDCClientAssertion {
+				a := validAssertion()
+				a.ServiceAccountToken.Audiences = []string{"https://sso.example.com", ""}
+				return a
+			},
+			wantErrors: []string{
+				"spec.oidc.clientAssertion.serviceAccountToken.audiences[1]",
+				"should be at least 1 chars long",
+			},
+		},
+		{
+			desc: "too many audiences",
+			assertion: func() *egv1a1.OIDCClientAssertion {
+				a := validAssertion()
+				a.ServiceAccountToken.Audiences = []string{"a", "b", "c", "d", "e", "f", "g", "h", "i"}
+				return a
+			},
+			wantErrors: []string{
+				"spec.oidc.clientAssertion.serviceAccountToken.audiences",
+				"must have at most 8 items",
+			},
+		},
+		{
+			desc: "expiration below the minimum",
+			assertion: func() *egv1a1.OIDCClientAssertion {
+				a := validAssertion()
+				a.ServiceAccountToken.Expiration = new(gwapiv1.Duration("9m"))
+				return a
+			},
+			wantErrors: []string{
+				"spec.oidc.clientAssertion.serviceAccountToken.expiration",
+				"expiration must be at least 10m",
+			},
+		},
+		{
+			desc: "ServiceAccount name that is not a DNS subdomain",
+			assertion: func() *egv1a1.OIDCClientAssertion {
+				a := validAssertion()
+				a.ServiceAccountToken.ServiceAccountName = "other-ns/oauth2-client"
+				return a
+			},
+			wantErrors: []string{
+				"spec.oidc.clientAssertion.serviceAccountToken.serviceAccountName",
+				"should match",
+			},
+		},
+		{
+			desc: "ServiceAccount name missing",
+			assertion: func() *egv1a1.OIDCClientAssertion {
+				a := validAssertion()
+				a.ServiceAccountToken.ServiceAccountName = ""
+				return a
+			},
+			wantErrors: []string{
+				"spec.oidc.clientAssertion.serviceAccountToken.serviceAccountName",
+				"should be at least 1 chars long",
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.desc, func(t *testing.T) {
+			sp := baseSP.DeepCopy()
+			sp.Name = fmt.Sprintf("sp-oidc-client-assertion-%v", time.Now().UnixNano())
+			sp.Spec.OIDC.ClientSecret = tc.clientSecret
+			if tc.assertion != nil {
+				sp.Spec.OIDC.ClientAssertion = tc.assertion()
+			}
 
 			err := c.Create(ctx, sp)
 			if (len(tc.wantErrors) != 0) != (err != nil) {

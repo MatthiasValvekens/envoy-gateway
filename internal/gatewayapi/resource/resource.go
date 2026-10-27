@@ -75,6 +75,10 @@ type Resources struct {
 	HTTPRouteFilters        []*egv1a1.HTTPRouteFilter      `json:"httpFilters,omitempty" yaml:"httpFilters,omitempty"`
 
 	ClusterTrustBundles []*certificatesv1b1.ClusterTrustBundle `json:"clusterTrustBundles,omitempty" yaml:"clusterTrustBundles,omitempty"`
+
+	// ServiceAccountTokens holds the ServiceAccount tokens requested for SecurityPolicies.
+	// They are credentials, so consumers that dump Resources must redact them.
+	ServiceAccountTokens []*ServiceAccountToken `json:"serviceAccountTokens,omitempty" yaml:"serviceAccountTokens,omitempty"`
 }
 
 func NewResources() *Resources {
@@ -521,6 +525,11 @@ func (r *Resources) Sort() {
 			return r.ClusterTrustBundles[i].Name < r.ClusterTrustBundles[j].Name
 		}
 		return r.ClusterTrustBundles[i].CreationTimestamp.Before(&r.ClusterTrustBundles[j].CreationTimestamp)
+	})
+
+	// Sort ServiceAccountTokens by namespace/name, then audiences and expiration
+	sort.Slice(r.ServiceAccountTokens, func(i, j int) bool {
+		return r.ServiceAccountTokens[i].Key() < r.ServiceAccountTokens[j].Key()
 	})
 
 	// Sort ExtensionRefFilters by creation timestamp, then namespace/name (unstructured resources)

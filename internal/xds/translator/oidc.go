@@ -160,10 +160,6 @@ func oauth2Config(securityFeatures *ir.SecurityFeatures) (*oauth2v3.OAuth2PerRou
 			ForwardBearerToken: oidc.ForwardAccessToken,
 			Credentials: &oauth2v3.OAuth2Credentials{
 				ClientId: oidc.ClientID,
-				TokenSecret: &tlsv3.SdsSecretConfig{
-					Name:      oauth2ClientSecretName(oidc),
-					SdsConfig: makeConfigSource(),
-				},
 				TokenFormation: &oauth2v3.OAuth2Credentials_HmacSecret{
 					HmacSecret: &tlsv3.SdsSecretConfig{
 						Name:      oauth2HMACSecretName(oidc),
@@ -196,6 +192,24 @@ func oauth2Config(securityFeatures *ir.SecurityFeatures) (*oauth2v3.OAuth2PerRou
 
 	if oidc.DefaultRefreshTokenTTL != nil {
 		oauth2.Config.DefaultRefreshTokenExpiresIn = durationpb.New(oidc.DefaultRefreshTokenTTL.Duration)
+	}
+
+	if len(oidc.ClientAssertion) > 0 {
+		// The client authenticates with a JWT that Envoy Gateway obtained from Kubernetes,
+		// so there is no client secret and Envoy does not sign anything.
+		oauth2.Config.AuthType = oauth2v3.OAuth2Config_CLIENT_ASSERTION
+		oauth2.Config.Credentials.ClientAssertion = &oauth2v3.OAuth2Credentials_ClientAssertion{
+			Type: oauth2v3.OAuth2Credentials_ClientAssertion_JWT,
+			AssertionSecret: &tlsv3.SdsSecretConfig{
+				Name:      oauth2ClientAssertionName(oidc),
+				SdsConfig: makeConfigSource(),
+			},
+		}
+	} else {
+		oauth2.Config.Credentials.TokenSecret = &tlsv3.SdsSecretConfig{
+			Name:      oauth2ClientSecretName(oidc),
+			SdsConfig: makeConfigSource(),
+		}
 	}
 
 	applyCookieNameOverrides(oauth2.Config.Credentials.CookieNames, oidc.CookieNameOverrides)
@@ -583,8 +597,13 @@ func createOAuth2Secrets(tCtx *types.ResourceVersionTable, routes []*ir.HTTPRout
 
 		// a separate secret is created for each route, even they share the same
 		// oauth2 client ID and secret.
-		clientSecret := buildOAuth2ClientSecret(route.Security.OIDC)
-		if err := addXdsSecret(tCtx, clientSecret); err != nil {
+		var clientCredential *tlsv3.Secret
+		if len(route.Security.OIDC.ClientAssertion) > 0 {
+			clientCredential = buildOAuth2ClientAssertion(route.Security.OIDC)
+		} else {
+			clientCredential = buildOAuth2ClientSecret(route.Security.OIDC)
+		}
+		if err := addXdsSecret(tCtx, clientCredential); err != nil {
 			errs = errors.Join(errs, err)
 		}
 
@@ -613,6 +632,21 @@ func buildOAuth2ClientSecret(oidc *ir.OIDC) *tlsv3.Secret {
 	return clientSecret
 }
 
+func buildOAuth2ClientAssertion(oidc *ir.OIDC) *tlsv3.Secret {
+	return &tlsv3.Secret{
+		Name: oauth2ClientAssertionName(oidc),
+		Type: &tlsv3.Secret_GenericSecret{
+			GenericSecret: &tlsv3.GenericSecret{
+				Secret: &corev3.DataSource{
+					Specifier: &corev3.DataSource_InlineBytes{
+						InlineBytes: oidc.ClientAssertion,
+					},
+				},
+			},
+		},
+	}
+}
+
 func buildOAuth2HMACSecret(oidc *ir.OIDC) *tlsv3.Secret {
 	hmacSecret := &tlsv3.Secret{
 		Name: oauth2HMACSecretName(oidc),
@@ -632,6 +666,10 @@ func buildOAuth2HMACSecret(oidc *ir.OIDC) *tlsv3.Secret {
 
 func oauth2ClientSecretName(oidc *ir.OIDC) string {
 	return fmt.Sprintf("oauth2/client_secret/%s", oidc.Name)
+}
+
+func oauth2ClientAssertionName(oidc *ir.OIDC) string {
+	return fmt.Sprintf("oauth2/client_assertion/%s", oidc.Name)
 }
 
 func oauth2HMACSecretName(oidc *ir.OIDC) string {

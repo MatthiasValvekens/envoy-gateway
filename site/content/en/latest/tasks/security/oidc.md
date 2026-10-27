@@ -392,6 +392,94 @@ You can also try to access `https://foo.example.com:8443` and `https://www.examp
 be able to see the response from the backend service since these HTTPRoutes are also protected by the same OIDC config,
 and the cookies are shared across subdomains.
 
+## Authenticate to the OIDC Provider with a ServiceAccount Token
+
+Instead of a client secret, the OIDC client can authenticate to the token endpoint of the OIDC provider with a
+Kubernetes ServiceAccount token, sent as a [JWT client assertion][rfc7523]. There is no secret to create or rotate:
+Envoy Gateway requests a short-lived token for a ServiceAccount with the Kubernetes [TokenRequest API][token-request],
+and renews it before it expires. The OIDC provider must trust the Kubernetes cluster as an issuer of client assertions,
+for example by federating the client with the service account issuer of the cluster. It checks the signature, issuer and
+audience of the token.
+
+A SecurityPolicy refers to the ServiceAccount, and the owner of the SecurityPolicy decides which ServiceAccount that is.
+The ServiceAccount must be in the namespace of the SecurityPolicy. Because the token identifies the ServiceAccount, use a
+separate ServiceAccount for each SecurityPolicy, and register each one as the identity of its own OIDC client. The OIDC
+provider can then tell the clients apart, and a client cannot authenticate as another one.
+
+Envoy Gateway only requests the token, so it does not need access to the ServiceAccount itself. It needs permission to
+`create` the `serviceaccounts/token` subresource, which the Envoy Gateway installation does not grant. The owner of the
+SecurityPolicy grants it for that one ServiceAccount, in the namespace of the SecurityPolicy. The following example
+assumes that Envoy Gateway runs as the `envoy-gateway` ServiceAccount in the `envoy-gateway-system` namespace:
+
+```shell
+cat <<EOF | kubectl apply -f -
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: my-app-oidc-client
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: my-app-oidc-client-token
+rules:
+- apiGroups: [""]
+  resources: ["serviceaccounts/token"]
+  resourceNames: ["my-app-oidc-client"]
+  verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: my-app-oidc-client-token
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: my-app-oidc-client-token
+subjects:
+- kind: ServiceAccount
+  name: envoy-gateway
+  namespace: envoy-gateway-system
+EOF
+```
+
+Then set `clientAssertion` instead of `clientSecret` in the SecurityPolicy. Exactly one of the two must be set.
+
+```shell
+cat <<EOF | kubectl apply -f -
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  name: oidc-example
+spec:
+  targetRefs:
+  - group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: myapp
+  oidc:
+    provider:
+      issuer: "https://my.keycloak.com/realms/master"
+      authorizationEndpoint: "https://my.keycloak.com/realms/master/protocol/openid-connect/auth"
+      tokenEndpoint: "https://my.keycloak.com/realms/master/protocol/openid-connect/token"
+    clientID: "${CLIENT_ID}"
+    clientAssertion:
+      serviceAccountToken:
+        serviceAccountName: my-app-oidc-client
+        audiences:
+        - "https://my.keycloak.com/realms/master"
+    redirectURL: "https://www.example.com:8443/myapp/oauth2/callback"
+    logoutPath: "/myapp/logout"
+EOF
+```
+
+* `audiences` is required. Set it to the audience that the OIDC provider expects of a client assertion. A token without
+  an explicit audience is also valid for the Kubernetes API server, so there is no default.
+* `expiration` is the lifetime to request for the token. It defaults to `1h` and must be at least `10m`. The Kubernetes
+  API server can grant another lifetime, and Envoy Gateway renews the token after 80% of the lifetime that it granted.
+
+If Envoy Gateway cannot get a token, for example because the Role is missing, the status of the SecurityPolicy says so.
+Envoy Gateway does not watch RBAC, and tries again every 30 seconds, so a newly granted Role is picked up shortly.
+
 ## Connect to an OIDC Provider with Self-Signed Certificate
 
 In some scenarios, the OIDC provider may use a self-signed certificate. To connect to an OIDC provider with a self-signed certificate, you need to configure it using the [Backend] resource within the [SecurityPolicy]. Additionally, use the [BackendTLSPolicy] to specify the CA certificate required to authenticate the OIDC provider.
@@ -790,3 +878,5 @@ Checkout the [Developer Guide](/community/develop) to get involved in the projec
 [backend-tls]: ../backend-tls
 [BackendSettings]: ../../../api/extension_types/#clustersettings
 [command-operators]: https://www.envoyproxy.io/docs/envoy/latest/configuration/observability/access_log/usage#command-operators
+[rfc7523]: https://datatracker.ietf.org/doc/html/rfc7523#section-2.2
+[token-request]: https://kubernetes.io/docs/reference/kubernetes-api/authentication-resources/token-request-v1/

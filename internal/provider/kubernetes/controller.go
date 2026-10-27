@@ -81,6 +81,9 @@ type gatewayAPIReconciler struct {
 	extSecretGVKs        []schema.GroupVersionKind
 	gatewayNamespaceMode bool
 
+	// serviceAccountTokens holds the ServiceAccount tokens that SecurityPolicies use as OIDC client assertions.
+	serviceAccountTokens *serviceAccountTokenCache
+
 	backendCRDExists       bool
 	btlsCRDExists          bool
 	btpCRDExists           bool
@@ -207,6 +210,7 @@ func newGatewayAPIController(ctx context.Context, mgr manager.Manager, cfg *conf
 		extSecretCRDExists:   make(map[schema.GroupVersionKind]bool),
 		gatewayNamespaceMode: cfg.EnvoyGateway.GatewayNamespaceMode(),
 	}
+	r.serviceAccountTokens = newServiceAccountTokenCache(time.Now, r.requestServiceAccountToken)
 
 	if byNamespaceSelectorEnabled(cfg.EnvoyGateway) {
 		r.namespaceLabel = cfg.EnvoyGateway.Provider.GetKubernetesConfiguration().Watch.NamespaceSelector
@@ -356,6 +360,9 @@ func (r *gatewayAPIReconciler) Reconcile(ctx context.Context, _ reconcile.Reques
 	)
 	logger.Info("reconciling gateways")
 
+	// Track which ServiceAccount tokens this pass uses, so the others can be dropped at the end.
+	r.serviceAccountTokens.begin()
+
 	// Get the GatewayClasses managed by the Envoy Gateway Controller.
 	managedGCs, err = r.managedGatewayClasses(ctx)
 	if err != nil {
@@ -377,6 +384,7 @@ func (r *gatewayAPIReconciler) Reconcile(ctx context.Context, _ reconcile.Reques
 	// The gatewayclass was already deleted/finalized and there are stale queue entries.
 	if managedGCs == nil {
 		r.resources.GatewayAPIResources.Delete(string(r.classController))
+		r.serviceAccountTokens.end()
 		logger.Info("no accepted gatewayclass")
 		return reconcile.Result{}, nil
 	}
@@ -423,8 +431,11 @@ func (r *gatewayAPIReconciler) Reconcile(ctx context.Context, _ reconcile.Reques
 		Message: message.ProviderResourcesMessageName,
 	}, 1)
 
+	// Reconcile again when a ServiceAccount token is due for renewal. A requeue bypasses the debouncer.
+	requeueAfter := r.serviceAccountTokens.end()
+
 	logger.Info("reconciled gateways successfully")
-	return reconcile.Result{}, nil
+	return reconcile.Result{RequeueAfter: requeueAfter}, nil
 }
 
 // reconcileGatewayClass reconciles a single managed GatewayClass: it processes its
@@ -1020,21 +1031,34 @@ func (r *gatewayAPIReconciler) processSecurityPolicyObjectRefs(
 
 		// Add the referenced Secrets in OIDC to the resourceTree
 		if oidc != nil {
-			if err := r.processSecretRef(
-				ctx,
-				resourceMap,
-				resourceTree,
-				resource.KindSecurityPolicy,
-				policy.Namespace,
-				policy.Name,
-				oidc.ClientSecret); err != nil {
-				// If the error is transient, we return it to allow Reconcile to retry.
-				if isTransientError(err) {
-					return err
+			if oidc.ClientSecret != nil {
+				if err := r.processSecretRef(
+					ctx,
+					resourceMap,
+					resourceTree,
+					resource.KindSecurityPolicy,
+					policy.Namespace,
+					policy.Name,
+					*oidc.ClientSecret); err != nil {
+					// If the error is transient, we return it to allow Reconcile to retry.
+					if isTransientError(err) {
+						return err
+					}
+					r.log.Error(err,
+						"failed to process OIDC SecretRef for SecurityPolicy",
+						"policy", policy, "secretRef", oidc.ClientSecret)
 				}
-				r.log.Error(err,
-					"failed to process OIDC SecretRef for SecurityPolicy",
-					"policy", policy, "secretRef", oidc.ClientSecret)
+			}
+
+			// A ServiceAccount token is requested, not referenced. A failure is recorded in the
+			// resourceTree, so that the status of the SecurityPolicy says why.
+			if oidc.ClientAssertion != nil && oidc.ClientAssertion.ServiceAccountToken != nil {
+				if err := r.processServiceAccountToken(
+					ctx, resourceTree, policy.Namespace, oidc.ClientAssertion.ServiceAccountToken); err != nil {
+					r.log.Error(err,
+						"failed to process OIDC ServiceAccountToken for SecurityPolicy",
+						"policy", policy)
+				}
 			}
 
 			if oidc.ClientIDRef != nil {

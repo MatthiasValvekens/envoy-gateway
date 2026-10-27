@@ -3762,6 +3762,11 @@ func (in *OIDC) DeepCopyInto(out *OIDC) {
 		*out = make(PrivateBytes, len(*in))
 		copy(*out, *in)
 	}
+	if in.ClientAssertion != nil {
+		in, out := &in.ClientAssertion, &out.ClientAssertion
+		*out = make(PrivateBytes, len(*in))
+		copy(*out, *in)
+	}
 	if in.HMACSecret != nil {
 		in, out := &in.HMACSecret, &out.HMACSecret
 		*out = make(PrivateBytes, len(*in))

@@ -830,7 +830,9 @@ func secretSecurityPolicyIndexFunc(rawObj client.Object) []string {
 	)
 
 	if securityPolicy.Spec.OIDC != nil {
-		secretReferences = append(secretReferences, securityPolicy.Spec.OIDC.ClientSecret)
+		if securityPolicy.Spec.OIDC.ClientSecret != nil {
+			secretReferences = append(secretReferences, *securityPolicy.Spec.OIDC.ClientSecret)
+		}
 		if securityPolicy.Spec.OIDC.ClientIDRef != nil {
 			secretReferences = append(secretReferences, *securityPolicy.Spec.OIDC.ClientIDRef)
 		}
